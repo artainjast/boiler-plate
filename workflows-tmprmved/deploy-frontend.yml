@@ -1,0 +1,35 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: CHECKOUT REPOSITORY
+        uses: actions/checkout@v4
+
+      - name: LOGIN TO DOCKER HUB
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: BUILD & PUSH
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/isell-client:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/isell-client:latest
+
+      - name: DEPLOY
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /home/${{ secrets.SERVER_USER }}/isell-client
+            docker-compose down
+            docker pull ${{ secrets.DOCKER_USERNAME }}/isell-client:latest
+            docker-compose up -d --build
+            docker system prune -af
